@@ -8,8 +8,16 @@ import 'screens/splash/splash_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'theme/app_theme.dart';
 import 'utils/app_routes.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://gxpitopdugqmxnckcwcd.supabase.co',
+    publishableKey: 'sb_publishable_xvkOomNXQ4024A1GNPre0A_qG2gCbMh',
+  );
+
   runApp(const AspireXApp());
 }
 

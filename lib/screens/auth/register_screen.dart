@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../../widgets/app_logo.dart';
 import '../../widgets/glass_card.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../utils/app_routes.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -20,6 +22,83 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool obscurePassword = true;
   bool obscureConfirmPassword = true;
+  bool isLoading = false;
+
+  Future<void> _register() async {
+    final name = nameController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+    final confirmPassword = confirmPasswordController.text;
+
+    if (name.isEmpty ||
+        email.isEmpty ||
+        password.isEmpty ||
+        confirmPassword.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all fields.')),
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Passwords do not match.')));
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      final response = await Supabase.instance.client.auth.signUp(
+        email: email,
+        password: password,
+        data: {'full_name': name},
+      );
+
+      if (!mounted) return;
+
+      if (response.session != null) {
+        await Supabase.instance.client.auth.signOut();
+
+        if (!mounted) return;
+
+        Navigator.pushReplacementNamed(context, AppRoutes.login);
+      } else {
+        await showDialog<void>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Check your email'),
+            content: const Text(
+              'We sent you a confirmation link. Confirm your email, then log in.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+
+        if (mounted) Navigator.pop(context);
+      }
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Something went wrong. Please try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -167,9 +246,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/login');
-                  },
+                  onPressed: isLoading ? null : _register,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.roseGold,
                     foregroundColor: AppColors.background,
@@ -178,14 +255,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: const Text(
-                    'CREATE ACCOUNT',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1.8,
-                    ),
-                  ),
+                  child: isLoading
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.background,
+                          ),
+                        )
+                      : const Text(
+                          'CREATE ACCOUNT',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.8,
+                          ),
+                        ),
                 ),
               ),
 
