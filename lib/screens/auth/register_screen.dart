@@ -4,7 +4,7 @@ import '../../constants/app_colors.dart';
 import '../../widgets/app_logo.dart';
 import '../../widgets/glass_card.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../utils/app_routes.dart';
+import 'verify_email_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -58,31 +58,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (!mounted) return;
 
-      if (response.session != null) {
-        await Supabase.instance.client.auth.signOut();
-
-        if (!mounted) return;
-
-        Navigator.pushReplacementNamed(context, AppRoutes.login);
-      } else {
-        await showDialog<void>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: const Text('Check your email'),
-            content: const Text(
-              'We sent you a confirmation link. Confirm your email, then log in.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-
-        if (mounted) Navigator.pop(context);
-      }
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => VerifyEmailScreen(email: email)),
+      );
     } on AuthException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
