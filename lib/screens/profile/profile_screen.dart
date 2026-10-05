@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -33,6 +34,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String financialGoal = "Emergency Fund";
 
   @override
+  void initState() {
+    super.initState();
+
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user != null) {
+      nameController.text = user.userMetadata?['full_name']?.toString() ?? '';
+
+      emailController.text = user.email ?? '';
+    }
+  }
+
+  @override
   void dispose() {
     nameController.dispose();
     emailController.dispose();
@@ -42,14 +56,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
-  void saveChanges() {
-    setState(() {
-      isEditing = false;
-    });
+  Future<void> saveChanges() async {
+    try {
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(data: {'full_name': nameController.text.trim()}),
+      );
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text("Profile saved successfully")));
+      if (!mounted) return;
+
+      setState(() {
+        isEditing = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Profile saved successfully")),
+      );
+    } on AuthException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Could not save profile changes.")),
+      );
+    }
   }
 
   @override
@@ -166,7 +200,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   const SizedBox(height: 15),
 
-                  textField("Email", Icons.email_outlined, emailController),
+                  TextField(
+                    controller: emailController,
+                    enabled: false,
+                    style: const TextStyle(color: textColor),
+                    decoration: inputDecoration("Email", Icons.email_outlined),
+                  ),
                 ],
               ),
             ),

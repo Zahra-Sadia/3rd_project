@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
+import 'screens/menu/menu_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/auth/welcome_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
@@ -49,6 +50,8 @@ class AspireXApp extends StatelessWidget {
         AppRoutes.home: (context) => const HomeScreen(),
 
         AppRoutes.profile: (context) => const ProfileScreen(),
+
+        AppRoutes.menu: (context) => const MenuScreen(),
       },
     );
   }
