@@ -47,7 +47,7 @@ class MenuScreen extends StatelessWidget {
             ),
 
             const SizedBox(height: 12),
-
+            //profile
             menuItem(
               context,
               icon: Icons.person_outline,
@@ -60,15 +60,26 @@ class MenuScreen extends StatelessWidget {
 
             const SizedBox(height: 12),
 
+            // Accounts
+            menuItem(
+              context,
+              icon: Icons.account_balance_wallet_outlined,
+              title: 'My Funds',
+              subtitle: 'Manage cards, cash and mobile banking',
+              onTap: () {
+                Navigator.pushNamed(context, AppRoutes.accounts);
+              },
+            ),
+
+            const SizedBox(height: 12),
+            //settings
             menuItem(
               context,
               icon: Icons.settings_outlined,
               title: 'Settings',
               subtitle: 'Manage your app settings',
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Settings coming soon')),
-                );
+                Navigator.pushNamed(context, AppRoutes.settings);
               },
             ),
 
@@ -82,20 +93,6 @@ class MenuScreen extends StatelessWidget {
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),
-            ),
-
-            const SizedBox(height: 12),
-
-            menuItem(
-              context,
-              icon: Icons.notifications_none_outlined,
-              title: 'Notifications',
-              subtitle: 'Manage your notifications',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Notifications coming soon')),
-                );
-              },
             ),
 
             const SizedBox(height: 12),

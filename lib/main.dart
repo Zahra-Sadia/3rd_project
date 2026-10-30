@@ -9,6 +9,9 @@ import 'screens/splash/splash_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'theme/app_theme.dart';
 import 'utils/app_routes.dart';
+import 'screens/accounts/accounts_screen.dart';
+import 'screens/settings/settings_screen.dart';
+import 'screens/goals/goals_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
@@ -52,6 +55,12 @@ class AspireXApp extends StatelessWidget {
         AppRoutes.profile: (context) => const ProfileScreen(),
 
         AppRoutes.menu: (context) => const MenuScreen(),
+
+        AppRoutes.accounts: (context) => const AccountsScreen(),
+
+        AppRoutes.settings: (context) => const SettingsScreen(),
+
+        AppRoutes.goals: (context) => const GoalsScreen(),
       },
     );
   }

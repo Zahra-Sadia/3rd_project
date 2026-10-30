@@ -226,7 +226,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Column(
                 children: [
                   DropdownButtonFormField<String>(
-                    value: currency,
+                    initialValue: currency,
 
                     onChanged: isEditing
                         ? (value) {
@@ -278,7 +278,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Column(
                 children: [
                   DropdownButtonFormField<String>(
-                    value: financialGoal,
+                    initialValue: financialGoal,
 
                     onChanged: isEditing
                         ? (value) {

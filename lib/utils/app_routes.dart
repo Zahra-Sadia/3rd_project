@@ -9,4 +9,7 @@ class AppRoutes {
   static const String home = '/home';
   static const String profile = '/profile';
   static const String menu = '/menu';
+  static const String accounts = '/accounts';
+  static const String settings = '/settings';
+  static const String goals = '/goals';
 }
