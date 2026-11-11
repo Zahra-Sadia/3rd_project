@@ -9,10 +9,14 @@ class AccountsScreen extends StatefulWidget {
 }
 
 class _AccountsScreenState extends State<AccountsScreen> {
-  static const Color background = Color(0xFF090B0D);
-  static const Color cardColor = Color(0xFF151719);
-  static const Color peach = Color(0xFFE8B77D);
-  static const Color muted = Color(0xFF9AA0A3);
+  // Black & rose-gold theme (same values as AppColors)
+  static const Color background = Color(0xFF08090D); // AppColors.background
+  static const Color cardColor = Color(0xFF10131A); // AppColors.surface
+  static const Color peach = Color(0xFFE9A39B); // AppColors.roseGold
+  static const Color peachLight = Color(0xFFF2B8AE); // AppColors.softPeach
+  static const Color border = Color(0xFF3A3438); // rose-tinted border
+  static const Color danger = Color(0xFFE58B83);
+  static const Color muted = Color(0xFFA39A9C);
 
   final supabase = Supabase.instance.client;
 
@@ -331,7 +335,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.white12),
+        borderSide: BorderSide(color: border.withOpacity(.8)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -356,14 +360,11 @@ class _AccountsScreenState extends State<AccountsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: const Text('Cancel', style: TextStyle(color: muted)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: Colors.redAccent),
-            ),
+            child: const Text('Delete', style: TextStyle(color: danger)),
           ),
         ],
       ),
@@ -412,7 +413,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
         decoration: BoxDecoration(
           color: cardColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white10),
+          border: Border.all(color: border.withOpacity(.7)),
         ),
         child: Row(
           children: [
@@ -471,7 +472,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: border.withOpacity(.7)),
       ),
       child: Row(
         children: [
@@ -523,11 +524,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                 tooltip: 'Delete fund source',
                 visualDensity: VisualDensity.compact,
                 onPressed: () => _deleteAccount(account),
-                icon: const Icon(
-                  Icons.delete_outline,
-                  color: Colors.redAccent,
-                  size: 21,
-                ),
+                icon: const Icon(Icons.delete_outline, color: danger, size: 21),
               ),
             ],
           ),
@@ -608,6 +605,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
                     ),
                     const SizedBox(height: 12),
                     ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: peach,
+                        foregroundColor: background,
+                      ),
                       onPressed: _loadAccounts,
                       child: const Text('Try Again'),
                     ),
@@ -617,6 +618,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
             )
           : RefreshIndicator(
               color: peach,
+              backgroundColor: cardColor,
               onRefresh: _loadAccounts,
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(18, 10, 18, 100),
@@ -626,10 +628,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
                       padding: const EdgeInsets.all(21),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF342A21), Color(0xFF171717)],
+                          colors: [Color(0xFF33252A), Color(0xFF0E0F13)],
                         ),
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: peach.withOpacity(0.3)),
+                        border: Border.all(color: peach.withOpacity(0.35)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -646,7 +648,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                           Text(
                             _money(_totalBalance),
                             style: const TextStyle(
-                              color: peach,
+                              color: peachLight,
                               fontSize: 30,
                               fontWeight: FontWeight.bold,
                             ),

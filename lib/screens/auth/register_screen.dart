@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../constants/app_colors.dart';
 import '../../widgets/app_logo.dart';
 import '../../widgets/glass_card.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'verify_email_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -24,134 +24,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool obscureConfirmPassword = true;
   bool isLoading = false;
 
-  Future<void> _register() async {
-    final name = nameController.text.trim();
-    final email = emailController.text.trim();
-    final password = passwordController.text;
-    final confirmPassword = confirmPasswordController.text;
+  // Password requirements
 
-    if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your full name.')),
-      );
-      return;
-    }
+  bool get hasMinLength => passwordController.text.length >= 8;
 
-    if (email.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please enter your email.')));
-      return;
-    }
+  bool get hasUppercase => RegExp(r'[A-Z]').hasMatch(passwordController.text);
 
-    final emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$');
+  bool get hasLowercase => RegExp(r'[a-z]').hasMatch(passwordController.text);
 
-    if (!emailRegex.hasMatch(email)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid email address.')),
-      );
-      return;
-    }
+  bool get hasNumber => RegExp(r'[0-9]').hasMatch(passwordController.text);
 
-    if (password.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please enter a password.')));
-      return;
-    }
+  bool get hasSpecialCharacter => RegExp(
+    r'[!@#$%^&*(),.?":{}|<>_\-\\/\[\]]',
+  ).hasMatch(passwordController.text);
 
-    if (password.length < 8) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password must be at least 8 characters.'),
-        ),
-      );
-      return;
-    }
-
-    if (!RegExp(r'[A-Z]').hasMatch(password)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password must contain at least one uppercase letter.'),
-        ),
-      );
-      return;
-    }
-
-    if (!RegExp(r'[a-z]').hasMatch(password)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password must contain at least one lowercase letter.'),
-        ),
-      );
-      return;
-    }
-
-    if (!RegExp(r'[0-9]').hasMatch(password)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password must contain at least one number.'),
-        ),
-      );
-      return;
-    }
-
-    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>_\-\\/\[\]]').hasMatch(password)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Password must contain at least one special character.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    if (confirmPassword.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please confirm your password.')),
-      );
-      return;
-    }
-
-    if (password != confirmPassword) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Passwords do not match.')));
-      return;
-    }
-
-    setState(() => isLoading = true);
-
-    try {
-      await Supabase.instance.client.auth.signUp(
-        email: email,
-        password: password,
-        data: {'full_name': name},
-      );
-
-      if (!mounted) return;
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => VerifyEmailScreen(email: email)),
-      );
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.message)));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Something went wrong. Please try again.'),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => isLoading = false);
-    }
-  }
+  bool get isPasswordValid =>
+      hasMinLength &&
+      hasUppercase &&
+      hasLowercase &&
+      hasNumber &&
+      hasSpecialCharacter;
 
   @override
   void dispose() {
@@ -162,248 +54,406 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 25),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // BACK
-              IconButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                icon: const Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  color: AppColors.primaryText,
-                  size: 20,
-                ),
-              ),
+  // Show snackbar
 
-              const SizedBox(height: 25),
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
 
-              // LOGO
-              const Center(child: AppLogo(fontSize: 46)),
+  // Register user
 
-              const SizedBox(height: 15),
+  Future<void> _register() async {
+    final name = nameController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+    final confirmPassword = confirmPasswordController.text;
 
-              const Center(
-                child: Text(
-                  'Create your account',
-                  style: TextStyle(
-                    color: AppColors.primaryText,
-                    fontSize: 23,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ),
+    if (name.isEmpty || email.isEmpty) {
+      _showMessage('Please fill in all required fields.');
+      return;
+    }
 
-              const SizedBox(height: 8),
+    if (!email.contains('@') || !email.contains('.')) {
+      _showMessage('Please enter a valid email address.');
+      return;
+    }
 
-              const Center(
-                child: Text(
-                  'Start discovering opportunities made for you.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppColors.secondaryText,
-                    fontSize: 12.5,
-                  ),
-                ),
-              ),
+    if (!isPasswordValid) {
+      _showMessage('Please fulfill all password requirements.');
+      return;
+    }
 
-              const SizedBox(height: 35),
+    if (password != confirmPassword) {
+      _showMessage('Passwords do not match.');
+      return;
+    }
 
-              _label('FULL NAME'),
+    setState(() {
+      isLoading = true;
+    });
 
-              const SizedBox(height: 8),
+    try {
+      final response = await Supabase.instance.client.auth.signUp(
+        email: email,
+        password: password,
+        data: {'full_name': name},
+      );
 
-              _textField(
-                controller: nameController,
-                hint: 'Enter your full name',
-                icon: Icons.person_outline_rounded,
-              ),
+      if (!mounted) return;
 
-              const SizedBox(height: 18),
-
-              _label('EMAIL'),
-
-              const SizedBox(height: 8),
-
-              _textField(
-                controller: emailController,
-                hint: 'Enter your email',
-                icon: Icons.email_outlined,
-                keyboardType: TextInputType.emailAddress,
-              ),
-
-              const SizedBox(height: 18),
-
-              _label('PASSWORD'),
-
-              const SizedBox(height: 8),
-
-              _textField(
-                controller: passwordController,
-                hint: 'Create a password',
-                icon: Icons.lock_outline_rounded,
-                obscureText: obscurePassword,
-                suffix: IconButton(
-                  onPressed: () {
-                    setState(() {
-                      obscurePassword = !obscurePassword;
-                    });
-                  },
-                  icon: Icon(
-                    obscurePassword
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
-                    color: AppColors.secondaryText,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              const Padding(
-                padding: EdgeInsets.only(left: 4),
-                child: Text(
-                  'Password must be at least 8 characters and contain '
-                  'uppercase, lowercase, number and special character.',
-                  style: TextStyle(
-                    color: AppColors.mutedText,
-                    fontSize: 10,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
-              _label('CONFIRM PASSWORD'),
-
-              const SizedBox(height: 8),
-
-              _textField(
-                controller: confirmPasswordController,
-                hint: 'Confirm your password',
-                icon: Icons.lock_outline_rounded,
-                obscureText: obscureConfirmPassword,
-                suffix: IconButton(
-                  onPressed: () {
-                    setState(() {
-                      obscureConfirmPassword = !obscureConfirmPassword;
-                    });
-                  },
-                  icon: Icon(
-                    obscureConfirmPassword
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
-                    color: AppColors.secondaryText,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 28),
-
-              // CREATE ACCOUNT BUTTON
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: isLoading ? null : _register,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.roseGold,
-                    foregroundColor: AppColors.background,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: isLoading
-                      ? const SizedBox(
-                          height: 22,
-                          width: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.background,
-                          ),
-                        )
-                      : const Text(
-                          'CREATE ACCOUNT',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.8,
-                          ),
-                        ),
-                ),
-              ),
-
-              const SizedBox(height: 25),
-
-              Center(
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
-                  child: const Text(
-                    'Already have an account? Login',
-                    style: TextStyle(
-                      color: AppColors.softPeach,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 25),
-            ],
+      if (response.user != null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VerifyEmailScreen(email: email),
           ),
+        );
+      }
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      _showMessage(error.message);
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage('Something went wrong. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  // Password requirement item
+
+  Widget _passwordRule(String text, bool isValid) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        children: [
+          Icon(
+            isValid ? Icons.check_circle : Icons.cancel,
+            size: 16,
+            color: isValid ? Colors.green : Colors.red,
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: isValid ? Colors.green : Colors.red,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Password requirements section
+
+  Widget _passwordRequirements() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _passwordRule('At least 8 characters', hasMinLength),
+        _passwordRule('At least one uppercase letter (A-Z)', hasUppercase),
+        _passwordRule('At least one lowercase letter (a-z)', hasLowercase),
+        _passwordRule('At least one number (0-9)', hasNumber),
+        _passwordRule(
+          'At least one special character (!@#\$%^&*)',
+          hasSpecialCharacter,
+        ),
+      ],
+    );
+  }
+
+  // Custom text field
+
+  Widget _textField({
+    required String hint,
+    required TextEditingController controller,
+    required IconData prefixIcon,
+    bool obscureText = false,
+    Widget? suffixIcon,
+    TextInputType keyboardType = TextInputType.text,
+    ValueChanged<String>? onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      onChanged: onChanged,
+      style: const TextStyle(color: AppColors.primaryText, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: AppColors.mutedText, fontSize: 13),
+        prefixIcon: Icon(prefixIcon, color: AppColors.softPeach, size: 20),
+        suffixIcon: suffixIcon,
+        filled: true,
+        fillColor: AppColors.background.withValues(alpha: 0.5),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(
+            color: AppColors.roseGold.withValues(alpha: 0.15),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.roseGold, width: 1.2),
         ),
       ),
     );
   }
 
-  Widget _label(String text) {
-    return Text(
-      text,
-      style: const TextStyle(
-        color: AppColors.secondaryText,
-        fontSize: 10,
-        letterSpacing: 2,
-      ),
-    );
-  }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 25),
+            child: Column(
+              children: [
+                const SizedBox(height: 15),
 
-  Widget _textField({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    bool obscureText = false,
-    TextInputType? keyboardType,
-    Widget? suffix,
-  }) {
-    return GlassCard(
-      borderRadius: 16.0,
-      padding: EdgeInsets.zero,
-      child: TextField(
-        controller: controller,
-        obscureText: obscureText,
-        keyboardType: keyboardType,
-        style: const TextStyle(color: AppColors.primaryText, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: AppColors.mutedText),
-          prefixIcon: Icon(icon, color: AppColors.roseGold),
-          suffixIcon: suffix,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 17,
+                // App logo
+                const AppLogo(fontSize: 65, showTagline: true),
+
+                const SizedBox(height: 30),
+
+                const Text(
+                  'Create Account',
+                  style: TextStyle(
+                    color: AppColors.primaryText,
+                    fontSize: 27,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                const Text(
+                  'Start managing your money with Fort Vault.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.secondaryText,
+                    fontSize: 13,
+                  ),
+                ),
+
+                const SizedBox(height: 28),
+
+                // Registration form
+                GlassCard(
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Full name
+                        const Text(
+                          'Full Name',
+                          style: TextStyle(
+                            color: AppColors.primaryText,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+
+                        const SizedBox(height: 9),
+
+                        _textField(
+                          hint: 'Enter your full name',
+                          controller: nameController,
+                          prefixIcon: Icons.person_outline,
+                        ),
+
+                        const SizedBox(height: 18),
+
+                        // Email
+                        const Text(
+                          'Email Address',
+                          style: TextStyle(
+                            color: AppColors.primaryText,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+
+                        const SizedBox(height: 9),
+
+                        _textField(
+                          hint: 'Enter your email',
+                          controller: emailController,
+                          prefixIcon: Icons.email_outlined,
+                          keyboardType: TextInputType.emailAddress,
+                        ),
+
+                        const SizedBox(height: 18),
+
+                        // Password
+                        const Text(
+                          'Password',
+                          style: TextStyle(
+                            color: AppColors.primaryText,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+
+                        const SizedBox(height: 9),
+
+                        _textField(
+                          hint: 'Create a password',
+                          controller: passwordController,
+                          prefixIcon: Icons.lock_outline,
+                          obscureText: obscurePassword,
+                          onChanged: (value) {
+                            setState(() {});
+                          },
+                          suffixIcon: IconButton(
+                            onPressed: () {
+                              setState(() {
+                                obscurePassword = !obscurePassword;
+                              });
+                            },
+                            icon: Icon(
+                              obscurePassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: AppColors.mutedText,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // Live password requirements
+                        _passwordRequirements(),
+
+                        const SizedBox(height: 18),
+
+                        // Confirm password
+                        const Text(
+                          'Confirm Password',
+                          style: TextStyle(
+                            color: AppColors.primaryText,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+
+                        const SizedBox(height: 9),
+
+                        _textField(
+                          hint: 'Confirm your password',
+                          controller: confirmPasswordController,
+                          prefixIcon: Icons.lock_outline,
+                          obscureText: obscureConfirmPassword,
+                          suffixIcon: IconButton(
+                            onPressed: () {
+                              setState(() {
+                                obscureConfirmPassword =
+                                    !obscureConfirmPassword;
+                              });
+                            },
+                            icon: Icon(
+                              obscureConfirmPassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: AppColors.mutedText,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 25),
+
+                        // Create account button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: isLoading ? null : _register,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.roseGold,
+                              foregroundColor: AppColors.background,
+                              disabledBackgroundColor: AppColors.roseGold
+                                  .withValues(alpha: 0.5),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: isLoading
+                                ? const SizedBox(
+                                    height: 22,
+                                    width: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.background,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Create Account',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 22),
+
+                // Login navigation
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'Already have an account? ',
+                      style: TextStyle(
+                        color: AppColors.secondaryText,
+                        fontSize: 13,
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        'Login',
+                        style: TextStyle(
+                          color: AppColors.roseGold,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 15),
+              ],
+            ),
           ),
         ),
       ),
