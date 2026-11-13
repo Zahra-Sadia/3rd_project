@@ -47,6 +47,11 @@ class _HomeScreenState extends State<HomeScreen> {
   double actualIncome = 0;
   String overviewPeriod = 'Day'; // 'Day' or 'Week'
 
+  // This month's real numbers - used by the balance card trend and badge
+  double monthIncome = 0;
+  double monthExpense = 0;
+  Map<int, double> monthDailyNet = {}; // day of month -> income - expense
+
   // No-spend calendar (current month)
   Map<int, double> dailyExpense = {}; // day of month -> actual expense
   DateTime? firstRecordDate; // first day the user ever recorded anything
@@ -282,12 +287,12 @@ class _HomeScreenState extends State<HomeScreen> {
       final first = DateTime(now.year, now.month, 1);
       final last = DateTime(now.year, now.month + 1, 0);
 
-      final expenseRows = List<Map<String, dynamic>>.from(
+      // All of this month's records (income and expense)
+      final monthRows = List<Map<String, dynamic>>.from(
         await supabase
             .from(_recordsTable)
-            .select('amount, record_date')
+            .select('record_type, amount, record_date')
             .eq('user_id', user.id)
-            .eq('record_type', 'expense')
             .gte('record_date', _dateKey(first))
             .lte('record_date', _dateKey(last)),
       );
@@ -301,17 +306,28 @@ class _HomeScreenState extends State<HomeScreen> {
             .limit(1),
       );
 
-      final daily = <int, double>{};
+      final daily = <int, double>{}; // expenses per day (no-spend calendar)
+      final net = <int, double>{}; // income - expense per day (trend)
+      double incomeTotal = 0;
+      double expenseTotal = 0;
 
-      for (final row in expenseRows) {
+      for (final row in monthRows) {
         final date = DateTime.tryParse(
           row['record_date'].toString().substring(0, 10),
         );
 
         if (date == null) continue;
 
-        daily[date.day] =
-            (daily[date.day] ?? 0) + ((row['amount'] as num?)?.toDouble() ?? 0);
+        final amount = (row['amount'] as num?)?.toDouble() ?? 0;
+
+        if (row['record_type'] == 'income') {
+          incomeTotal += amount;
+          net[date.day] = (net[date.day] ?? 0) + amount;
+        } else if (row['record_type'] == 'expense') {
+          expenseTotal += amount;
+          daily[date.day] = (daily[date.day] ?? 0) + amount;
+          net[date.day] = (net[date.day] ?? 0) - amount;
+        }
       }
 
       DateTime? firstDate;
@@ -327,10 +343,78 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         dailyExpense = daily;
         firstRecordDate = firstDate;
+        monthIncome = incomeTotal;
+        monthExpense = expenseTotal;
+        monthDailyNet = net;
       });
     } catch (error) {
       debugPrint('No-spend days loading error: $error');
     }
+  }
+
+  // ---------- Balance card: trend and status (real data) ----------
+
+  // This month's change = income - expenses. Transfers do not change the
+  // total, so only income and expenses count.
+  double get monthNet => monthIncome - monthExpense;
+
+  // Balance on the 1st of the month = balance today - this month's change
+  double get monthStartBalance => totalBalance - monthNet;
+
+  // Only show the trend when there is real data to compare
+  bool get hasMonthTrend =>
+      accounts.isNotEmpty &&
+      (monthIncome > 0 || monthExpense > 0) &&
+      monthStartBalance > 0;
+
+  double get monthChangePercent => monthNet / monthStartBalance * 100;
+
+  // One point for the 1st, then one for each day up to today
+  List<double> get balanceTrend {
+    final today = DateTime.now().day;
+    final points = <double>[monthStartBalance];
+    double running = monthStartBalance;
+
+    for (int day = 1; day <= today; day++) {
+      running += monthDailyNet[day] ?? 0;
+      points.add(running);
+    }
+
+    return points;
+  }
+
+  String _percentText(double value) {
+    if (value.abs() < 0.05) return '0%';
+
+    final digits = value.abs() >= 100 ? 0 : 1;
+    return '${value > 0 ? '+' : '-'}${value.abs().toStringAsFixed(digits)}%';
+  }
+
+  // null = not enough real data to judge, so no badge is shown
+  ({String label, Color color, IconData icon})? get healthStatus {
+    if (accounts.isEmpty) return null;
+
+    if (remainingBalance < 0) {
+      return (label: 'Low balance', color: red, icon: Icons.error_outline);
+    }
+
+    if (monthIncome <= 0) return null;
+
+    final spentRatio = monthExpense / monthIncome;
+
+    if (spentRatio >= 1) {
+      return (label: 'Overspending', color: red, icon: Icons.error_outline);
+    }
+
+    if (spentRatio >= 0.8) {
+      return (
+        label: 'Watch out',
+        color: peachLight,
+        icon: Icons.warning_amber_rounded,
+      );
+    }
+
+    return (label: 'Healthy', color: green, icon: Icons.eco);
   }
 
   double get totalBalance => accounts.fold<double>(
@@ -652,10 +736,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(color: muted, fontSize: 11),
                   ),
                 ),
-              const SizedBox(height: 10),
-              _quickActions(),
               const SizedBox(height: 14),
               _spendingCard(),
+              const SizedBox(height: 14),
+              _quickActions(),
               const SizedBox(height: 14),
               _noSpendCard(),
               const SizedBox(height: 16),
@@ -743,6 +827,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _balanceCard() {
+    final status = healthStatus;
+    final showTrend = hasMonthTrend;
+    final change = showTrend ? monthChangePercent : 0.0;
+    final trend = showTrend ? balanceTrend : const <double>[];
+    final trendColor = change >= 0 ? green : red;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(15, 13, 13, 12),
       decoration: BoxDecoration(
@@ -766,13 +856,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 size: 15,
               ),
               const SizedBox(width: 7),
-              const Text(
-                'Remaining Balance After Today’s Planned Expenses',
-                style: TextStyle(color: Colors.white70, fontSize: 11),
+              const Expanded(
+                child: Text(
+                  'Remaining Balance After Today’s Planned Expenses',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.white70, fontSize: 11),
+                ),
               ),
               const SizedBox(width: 5),
               const Icon(Icons.info_outline, color: muted, size: 11),
-              const Spacer(),
+              const SizedBox(width: 8),
               DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   value: selectedCurrency,
@@ -818,44 +912,78 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF16362C),
-                  borderRadius: BorderRadius.circular(20),
+              if (status != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: status.color.withOpacity(.16),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(status.icon, color: status.color, size: 13),
+                      const SizedBox(width: 4),
+                      Text(
+                        status.label,
+                        style: TextStyle(
+                          color: status.color,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.eco, color: green, size: 11),
-                    SizedBox(width: 4),
-                    Text(
-                      'Healthy',
-                      style: TextStyle(color: green, fontSize: 9),
+            ],
+          ),
+          if (showTrend) ...[
+            const SizedBox(height: 3),
+            Row(
+              children: [
+                Icon(
+                  change >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
+                  color: trendColor,
+                  size: 14,
+                ),
+                const SizedBox(width: 3),
+                Text(
+                  _percentText(change),
+                  style: TextStyle(
+                    color: trendColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 7),
+                const Text(
+                  'this month',
+                  style: TextStyle(color: muted, fontSize: 11),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 155),
+                      child: SizedBox(
+                        height: 38,
+                        width: double.infinity,
+                        child: CustomPaint(
+                          painter: _TrendPainter(
+                            values: trend,
+                            color: change >= 0 ? peach : red,
+                          ),
+                        ),
+                      ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 3),
-          Row(
-            children: [
-              const Icon(Icons.arrow_upward, color: green, size: 14),
-              const SizedBox(width: 3),
-              const Text('+12%', style: TextStyle(color: green, fontSize: 10)),
-              const SizedBox(width: 7),
-              const Text(
-                'from last month',
-                style: TextStyle(color: muted, fontSize: 10),
-              ),
-              const Spacer(),
-              SizedBox(
-                width: 155,
-                height: 38,
-                child: CustomPaint(painter: _LineChartPainter()),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
 
           // Account category balances
           const SizedBox(height: 12),
@@ -1267,7 +1395,14 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         color: card,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: border.withOpacity(.7)),
+        border: Border.all(color: peach.withOpacity(.4)),
+        boxShadow: [
+          BoxShadow(
+            color: peach.withOpacity(.14),
+            blurRadius: 22,
+            spreadRadius: 1,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1663,58 +1798,70 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _LineChartPainter extends CustomPainter {
+// Line of the balance through this month, drawn from real values
+class _TrendPainter extends CustomPainter {
+  final List<double> values;
+  final Color color;
+
+  const _TrendPainter({required this.values, required this.color});
+
   @override
   void paint(Canvas canvas, Size size) {
+    if (values.length < 2) return;
+
+    final minValue = values.reduce(math.min);
+    final maxValue = values.reduce(math.max);
+    final range = maxValue - minValue;
+
+    // keep a little room at the top and bottom of the chart
+    const pad = 4.0;
+    final usable = size.height - pad * 2;
+
     final points = <Offset>[
-      Offset(0, size.height * .82),
-      Offset(size.width * .10, size.height * .70),
-      Offset(size.width * .18, size.height * .77),
-      Offset(size.width * .27, size.height * .56),
-      Offset(size.width * .36, size.height * .64),
-      Offset(size.width * .46, size.height * .45),
-      Offset(size.width * .56, size.height * .50),
-      Offset(size.width * .66, size.height * .34),
-      Offset(size.width * .76, size.height * .38),
-      Offset(size.width * .86, size.height * .20),
-      Offset(size.width * .94, size.height * .23),
-      Offset(size.width, size.height * .05),
+      for (int i = 0; i < values.length; i++)
+        Offset(
+          size.width * i / (values.length - 1),
+          range == 0
+              ? size.height / 2
+              : pad + usable * (1 - (values[i] - minValue) / range),
+        ),
     ];
+
     final path = Path()..moveTo(points.first.dx, points.first.dy);
     for (int i = 1; i < points.length; i++) {
       path.lineTo(points[i].dx, points[i].dy);
     }
+
     final fillPath = Path.from(path)
       ..lineTo(size.width, size.height)
       ..lineTo(0, size.height)
       ..close();
+
     canvas.drawPath(
       fillPath,
       Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0x44E9A39B), Color(0x00E9A39B)],
+        ..shader = LinearGradient(
+          colors: [color.withOpacity(.27), color.withOpacity(0)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ).createShader(Offset.zero & size),
     );
+
     canvas.drawPath(
       path,
       Paint()
-        ..color = const Color(0xFFE9A39B)
+        ..color = color
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.1
+        ..strokeWidth = 1.2
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round,
     );
-    canvas.drawCircle(
-      points.last,
-      2.5,
-      Paint()..color = const Color(0xFFF2B8AE),
-    );
+
+    canvas.drawCircle(points.last, 2.5, Paint()..color = color);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _TrendPainter oldDelegate) => true;
 }
 
 class _DonutPainter extends CustomPainter {
